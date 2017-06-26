@@ -1,11 +1,11 @@
 #!/bin/sh
 
-pl_list=(".rgw.root" ".rgw.control" ".rgw.gc" ".rgw.buckets" ".rgw.buckets.index" ".rgw.buckets.extra" ".log" ".intent-log" ".usage" ".users" ".users.email" ".users.swift" ".users.uid")
+pl_list=( "default.rgw.data.root" ".rgw.root" "default.rgw.control" "default.rgw.gc" "default.rgw.buckets.data" "default.rgw.buckets.index" "default.rgw.buckets.extra" "default.rgw.log" "default.rgw.meta" "default.rgw.intent-log" "default.rgw.usage" "default.rgw.users" "default.rgw.users.email" "default.rgw.users.swift" "default.rgw.users.uid")
 pg=32
-pg_data=2048
-pg_index=128
-k=4
-m=2
+pg_data=1024
+pg_index=64
+k=6
+m=3
 
 
 function delete_pools {
@@ -23,10 +23,10 @@ sleep 5
 function replication {
 for pl in ${pl_list[@]}
 do
-    if [ $pl == ".rgw.buckets" ]
+    if [ $pl == "default.rgw.buckets.data" ]
     then
         ceph osd pool create $pl $pg_data replicated
-    elif [ $pl == ".rgw.buckets.index" ]
+    elif [ $pl == "default.rgw.buckets.index" ]
     then
         ceph osd pool create $pl $pg_index replicated
     else
@@ -43,12 +43,12 @@ ceph osd erasure-code-profile set myprofile k=$k m=$m ruleset-failure-domain=osd
 
 for pl in ${pl_list[@]}
 do
-    if [ $pl == ".rgw.buckets" ]
+    if [ $pl == "default.rgw.buckets.data" ]
     then
-        ceph osd pool create $pl $pg_data replicated
-    elif [ $pl == ".rgw.buckets.index" ]
+        ceph osd pool create $pl $pg_data $pg_data erasure myprofile
+    elif [ $pl == "default.rgw.buckets.index" ]
     then
-        ceph osd pool create $pl $pg_index erasure myprofile
+        ceph osd pool create $pl $pg_index replicated
     else
         ceph osd pool create $pl $pg replicated
 
@@ -56,13 +56,14 @@ do
 done
 }
 
-while getopts r:h OPTION
+while getopts r:h:d OPTION
 do
  case "${OPTION}" in
  r) REPLICATION=${OPTARG};;
  h) echo "usage ./scrit -r [rep | ec]"
     exit 1
  ;;
+ d) delete_pools;;
  *)echo "usage ./scrit -r [rep | ec]"
    exit 1
  ;;
